@@ -1,0 +1,13 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+python-multipart>=0.0.18
+python-dotenv>=1.0.0
+httpx>=0.28.0
+python-jose[cryptography]>=3.3.0
+supabase>=2.11.0
+groq>=0.13.0
+google-genai>=0.1.1
+pytest>=8.3.0
+pytest-asyncio>=0.24.0

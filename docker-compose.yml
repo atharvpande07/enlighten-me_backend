@@ -1,0 +1,55 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: enlighten_api_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=production
+      - PORT=8000
+    expose:
+      - "8000"
+    networks:
+      - enlighten_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: enlighten_caddy_proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3 Support
+    environment:
+      - DOMAIN=${DOMAIN:-api.enlightenme.app}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - enlighten_network
+
+volumes:
+  caddy_data:
+    name: enlighten_caddy_ssl_data
+  caddy_config:
+    name: enlighten_caddy_config_data
+
+networks:
+  enlighten_network:
+    name: enlighten_app_network
+    driver: bridge
