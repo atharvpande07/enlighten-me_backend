@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     
     # Payload & Routing Guardrails
     MAX_AUDIO_BYTES: int = 19_500_000  # 19.5 MB ceiling for Groq Whisper
-    ROUTER_TIMEOUT_SECONDS: int = 120   # Explicit 120s timeout boundary for Caddy/Uvicorn
+    ROUTER_TIMEOUT_SECONDS: int = 180   # Explicit 180s timeout boundary for long lecture synthesis
     
     # Fair Usage Policy Defaults (in seconds)
     DEFAULT_FREE_FUP_LIMIT: int = 10800    # 3 Hours = 10,800s
