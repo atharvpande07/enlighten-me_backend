@@ -40,7 +40,9 @@ class Settings(BaseSettings):
     REVENUECAT_WEBHOOK_SECRET: str = "placeholder_webhook_secret_key"
     
     # Payload & Routing Guardrails
-    MAX_AUDIO_BYTES: int = 19_500_000  # 19.5 MB ceiling for Groq Whisper
+    MAX_AUDIO_BYTES: int = 150_000_000  # 150 MB ceiling for client uploads (supports up to ~2.5 hours in original quality)
+    GROQ_CHUNK_SIZE_LIMIT: int = 19_000_000  # 19 MB single-chunk ceiling for Groq Whisper
+    GROQ_CHUNK_DURATION_SECONDS: int = 600  # 10 minutes (600s) per chunk slice for seamless transcription
     ROUTER_TIMEOUT_SECONDS: int = 180   # Explicit 180s timeout boundary for long lecture synthesis
     
     # Fair Usage Policy Defaults (in seconds)

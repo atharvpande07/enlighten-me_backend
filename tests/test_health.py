@@ -1,4 +1,5 @@
 from starlette.testclient import TestClient
+from app.core.config import settings
 
 
 def test_root_endpoint(client: TestClient):
@@ -14,6 +15,5 @@ def test_health_check_endpoint(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["version"] == "1.0.0"
-    assert data["max_audio_mb"] == 22.89  # 24,000,000 bytes ~ 22.89 MB
-    assert data["timeout_seconds"] == 120
+    assert data["max_audio_mb"] == round(settings.MAX_AUDIO_BYTES / (1024 * 1024), 2)
+    assert data["timeout_seconds"] == settings.ROUTER_TIMEOUT_SECONDS

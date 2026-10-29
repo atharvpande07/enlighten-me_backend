@@ -5,7 +5,6 @@ from app.core.logging import logger
 from app.core.security import get_current_user_id
 from app.schemas.study_guide import LectureProcessResponse
 from app.services.quota_service import QuotaService
-from app.services.audio_cleaner import AudioCleanerService
 from app.services.groq_transcription import GroqTranscriptionService
 from app.services.gemini_structuring import GeminiStructuringService
 from app.services.lecture_service import LectureService
@@ -30,11 +29,12 @@ async def process_lecture(
 ):
     # 1. Payload Size Validation Guard (Groq 24MB ceiling)
     # Check Content-Length header or file size if available prior to buffer read
+    max_mb = round(settings.MAX_AUDIO_BYTES / (1024 * 1024))
     if audio_file.size and audio_file.size > settings.MAX_AUDIO_BYTES:
-        logger.warning("Upload rejected: Audio file size %d exceeds 24MB", audio_file.size)
+        logger.warning("Upload rejected: Audio file size %d exceeds %dMB limit", audio_file.size, max_mb)
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail="Audio file exceeds 24MB limit.",
+            detail=f"Audio file exceeds {max_mb}MB limit.",
         )
 
     # 2. Fair Usage Policy (FUP) Atomic Verification
@@ -44,10 +44,10 @@ async def process_lecture(
     # 3. Read Binary Stream In-Memory (Zero Disk Write Policy)
     audio_bytes = await audio_file.read()
     if len(audio_bytes) > settings.MAX_AUDIO_BYTES:
-        logger.warning("Upload rejected: Read %d bytes exceeding 24MB limit", len(audio_bytes))
+        logger.warning("Upload rejected: Read %d bytes exceeding %dMB limit", len(audio_bytes), max_mb)
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail="Audio file exceeds 24MB limit.",
+            detail=f"Audio file exceeds {max_mb}MB limit.",
         )
 
     if len(audio_bytes) == 0:
@@ -57,22 +57,15 @@ async def process_lecture(
         )
 
     try:
-        # 3.5 Automated In-Memory Classroom Noise Filtering (High-pass fan cutoff & speech normalization)
-        clean_bytes, clean_filename = await AudioCleanerService.clean_and_normalize(
-            audio_bytes,
-            original_filename=audio_file.filename or "lecture.m4a",
-        )
-
-        # 4. In-Memory Groq Transcription (Whisper Large V3 Turbo)
+        # 4. In-Memory Groq Transcription (Whisper Large V3 Turbo with automated chunking)
         groq_service = GroqTranscriptionService()
         segments = await groq_service.transcribe_audio(
-            clean_bytes,
-            filename=clean_filename,
+            audio_bytes,
+            filename=audio_file.filename or "lecture.m4a",
         )
 
         # 5. Flush audio bytes from memory immediately after transcription
         del audio_bytes
-        del clean_bytes
 
         # 6. Gemini 2.5 Flash Structuring & Quality Gate
         gemini_service = GeminiStructuringService()

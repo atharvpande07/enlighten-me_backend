@@ -4,6 +4,7 @@ from unittest.mock import patch, MagicMock, AsyncMock
 import pytest
 from starlette.testclient import TestClient
 from app.core.security import create_mock_jwt
+from app.core.config import settings
 from app.schemas.study_guide import StudyGuideContent, TimelineItem, ActionItem
 
 
@@ -16,13 +17,14 @@ def test_process_lecture_unauthorized(client: TestClient):
 
 
 def test_process_lecture_payload_too_large(client: TestClient):
-    """Assert audio payload exceeding 24MB returns 413 Payload Too Large."""
+    """Assert audio payload exceeding max audio limit returns 413 Payload Too Large."""
     user_id = str(uuid.uuid4())
     token = create_mock_jwt(user_id)
     headers = {"Authorization": f"Bearer {token}"}
 
-    # Generate oversized payload > 24MB
-    oversized_bytes = b"0" * (24_000_001)
+    # Generate oversized payload > MAX_AUDIO_BYTES
+    max_mb = round(settings.MAX_AUDIO_BYTES / (1024 * 1024))
+    oversized_bytes = b"0" * (settings.MAX_AUDIO_BYTES + 1)
     files = {"audio_file": ("oversized.m4a", oversized_bytes, "audio/mp4")}
     data = {"duration_seconds": 1800}
 
@@ -30,7 +32,7 @@ def test_process_lecture_payload_too_large(client: TestClient):
         mock_quota.return_value = {"is_allowed": True}
         response = client.post("/api/v1/lectures/process", data=data, files=files, headers=headers)
         assert response.status_code == 413
-        assert response.json()["detail"] == "Audio file exceeds 24MB limit."
+        assert response.json()["detail"] == f"Audio file exceeds {max_mb}MB limit."
 
 
 def test_process_lecture_fup_exceeded(client: TestClient):
@@ -161,3 +163,54 @@ def test_quality_gate_rejection(client: TestClient):
         res_json = response.json()
         assert res_json["study_guide"]["is_valid_lecture"] is False
         assert "Unusable audio" in res_json["study_guide"]["warning_banner"]
+
+
+@pytest.mark.asyncio
+async def test_groq_chunked_transcription_merging():
+    """Verify that audio exceeding 19MB is chunked and timestamps are offset continuously."""
+    from app.services.groq_transcription import GroqTranscriptionService
+
+    service = GroqTranscriptionService(api_key="mock_key")
+    # Simulate a 25MB payload
+    mock_large_audio = b"dummy_audio_bytes" * 2_000_000
+
+    # Mock chunk splitting into two 600-second chunks
+    fake_chunks = [
+        (b"chunk1_bytes", "chunk_000.m4a", 600.0),
+        (b"chunk2_bytes", "chunk_001.m4a", 450.0),
+    ]
+
+    chunk1_segments = [
+        {"start_seconds": 10.0, "end_seconds": 15.0, "timestamp_start": "00:10", "timestamp_end": "00:15", "text": "First chunk intro"},
+        {"start_seconds": 580.0, "end_seconds": 595.0, "timestamp_start": "09:40", "timestamp_end": "09:55", "text": "First chunk conclusion"},
+    ]
+
+    chunk2_segments = [
+        {"start_seconds": 605.0, "end_seconds": 612.0, "timestamp_start": "10:05", "timestamp_end": "10:12", "text": "Second chunk start"},
+        {"start_seconds": 1040.0, "end_seconds": 1048.0, "timestamp_start": "17:20", "timestamp_end": "17:28", "text": "Lecture completed"},
+    ]
+
+    with patch.object(service, "_split_audio_into_chunks", return_value=fake_chunks), \
+         patch.object(service, "_transcribe_single_chunk") as mock_single:
+
+        mock_single.side_effect = [
+            (chunk1_segments, 600.0),
+            (chunk2_segments, 450.0),
+        ]
+
+        merged = await service.transcribe_audio(mock_large_audio, filename="long_lecture.m4a")
+
+        assert len(merged) == 4
+        assert merged[0]["text"] == "First chunk intro"
+        assert merged[0]["timestamp_start"] == "00:10"
+
+        assert merged[1]["text"] == "First chunk conclusion"
+        assert merged[1]["timestamp_start"] == "09:40"
+
+        assert merged[2]["text"] == "Second chunk start"
+        assert merged[2]["timestamp_start"] == "10:05"
+
+        assert merged[3]["text"] == "Lecture completed"
+        assert merged[3]["timestamp_start"] == "17:20"
+        assert mock_single.call_count == 2
+
