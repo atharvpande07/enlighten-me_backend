@@ -5,9 +5,9 @@ from app.core.config import settings
 from app.core.logging import logger
 
 INITIAL_PROMPT = (
-    "Indian university classroom technical lecture. The professor is speaking from the front of the hall in a mix of "
+    "Indian university classroom lecture. The professor is speaking from the front of the hall in a mix of "
     "English, Hindi, and Marathi (Hinglish/Marathi). Ignore background ceiling fan hum, room echo, and distant acoustics. "
-    "Focus on technical vocabulary, derivations, derivations, formulas, definitions, and exam topics: "
+    "Focus on vocabulary, understand topics: "
     "Ye concept samajh aaya? Next point bagha."
 )
 

@@ -31,11 +31,11 @@ YOUR OBJECTIVES:
      * warning_banner = null
 
 2. TRANSLATION & NORMALIZATION:
-   - Convert all informal, phonetic Hinglish/Marathi explanations into rigorous, clear, professional Academic English.
+   - Understand Convert all informal, phonetic Hinglish/Marathi explanations into rigorous, clear, professional Academic English.
    - Preserve technical terminology, equations, theorems, and definitions accurately.
 
 3. STRUCTURED EXTRACTIONS:
-   - overall_summary: A comprehensive, cohesive academic synthesis of the main topics taught.
+   - overall_summary: A comprehensive, cohesive academic synthesis of all topics taught.
    - timestamped_timeline: Array of entries with timestamp_start, timestamp_end, topic, and summary.
    - chronological_notes: Formatted markdown bullet points detailing core concepts, formulas, and definitions.
    - action_items: MUST strictly categorize each item as one of: 'exam_hint', 'assignment', 'deadline', or 'reading'.
