@@ -5,6 +5,7 @@ from app.core.logging import logger
 from app.core.security import get_current_user_id
 from app.schemas.study_guide import LectureProcessResponse
 from app.services.quota_service import QuotaService
+from app.services.audio_cleaner import AudioCleanerService
 from app.services.groq_transcription import GroqTranscriptionService
 from app.services.gemini_structuring import GeminiStructuringService
 from app.services.lecture_service import LectureService
@@ -56,15 +57,22 @@ async def process_lecture(
         )
 
     try:
+        # 3.5 Automated In-Memory Classroom Noise Filtering (High-pass fan cutoff & speech normalization)
+        clean_bytes, clean_filename = await AudioCleanerService.clean_and_normalize(
+            audio_bytes,
+            original_filename=audio_file.filename or "lecture.m4a",
+        )
+
         # 4. In-Memory Groq Transcription (Whisper Large V3 Turbo)
         groq_service = GroqTranscriptionService()
         segments = await groq_service.transcribe_audio(
-            audio_bytes,
-            filename=audio_file.filename or "lecture.m4a",
+            clean_bytes,
+            filename=clean_filename,
         )
 
         # 5. Flush audio bytes from memory immediately after transcription
         del audio_bytes
+        del clean_bytes
 
         # 6. Gemini 2.5 Flash Structuring & Quality Gate
         gemini_service = GeminiStructuringService()

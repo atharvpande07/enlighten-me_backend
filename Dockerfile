@@ -22,9 +22,10 @@ FROM python:3.12-slim AS runner
 
 WORKDIR /app
 
-# Install minimal runtime libraries (curl for healthchecks)
+# Install minimal runtime libraries (curl for healthchecks, ffmpeg for classroom audio denoising)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy pre-built wheels from builder
