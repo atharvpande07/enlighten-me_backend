@@ -214,3 +214,59 @@ async def test_groq_chunked_transcription_merging():
         assert merged[3]["timestamp_start"] == "17:20"
         assert mock_single.call_count == 2
 
+
+def test_process_lecture_with_user_inputted_subject_title(client: TestClient):
+    """Assert user-inputted lecture_title is properly forwarded to Gemini and persistence."""
+    user_id = str(uuid.uuid4())
+    token = create_mock_jwt(user_id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    files = {"audio_file": ("lecture.m4a", b"fake audio binary bytes", "audio/mp4")}
+    data = {
+        "duration_seconds": 1200,
+        "lecture_title": "Database Management Systems - Normalization",
+    }
+
+    mock_segments = [
+        {"start_seconds": 0.0, "end_seconds": 60.0, "timestamp_start": "00:00", "timestamp_end": "01:00", "text": "Normalization avoids data redundancy."}
+    ]
+
+    mock_guide = StudyGuideContent(
+        is_valid_lecture=True,
+        warning_banner=None,
+        overall_summary="Introduction to BCNF and 3NF.\n\n**Off-Topic Rants & Tangents:** None detected; the lecture remained focused on the subject.",
+        timestamped_timeline=[],
+        chronological_notes=["BCNF eliminates anomalies."],
+        action_items=[],
+        whatsapp_share_text="*DBMS Study Summary*",
+    )
+
+    with patch("app.services.quota_service.QuotaService.validate_fup_quota") as mock_validate, \
+         patch("app.services.groq_transcription.GroqTranscriptionService.transcribe_audio", new_callable=AsyncMock) as mock_groq, \
+         patch("app.services.gemini_structuring.GeminiStructuringService.structure_lecture", new_callable=AsyncMock) as mock_gemini, \
+         patch("app.services.lecture_service.LectureService.persist_lecture_and_study_guide") as mock_persist, \
+         patch("app.services.quota_service.QuotaService.deduct_fup_quota") as mock_deduct:
+
+        mock_validate.return_value = {"is_allowed": True}
+        mock_groq.return_value = mock_segments
+        mock_gemini.return_value = mock_guide
+        mock_persist.return_value = "db-lecture-uuid-123"
+        mock_deduct.return_value = 10000
+
+        response = client.post("/api/v1/lectures/process", data=data, files=files, headers=headers)
+        assert response.status_code == 200
+
+        # Verify title was passed to Gemini structuring
+        mock_gemini.assert_called_once_with(
+            segments=mock_segments,
+            lecture_title="Database Management Systems - Normalization",
+        )
+
+        # Verify title was persisted to Supabase
+        mock_persist.assert_called_once_with(
+            user_id=user_id,
+            duration_seconds=1200,
+            study_guide=mock_guide,
+            title="Database Management Systems - Normalization",
+        )
+

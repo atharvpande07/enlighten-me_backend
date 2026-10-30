@@ -32,7 +32,10 @@ class StudyGuideContent(BaseModel):
     )
     overall_summary: str = Field(
         ...,
-        description="High-level synthesis of the entire lecture in clear academic English"
+        description=(
+            "High-level synthesis of the entire lecture in clear academic English, "
+            "concluding with a specific '**Off-Topic Rants & Tangents:**' section detailing any lecturer tangents or noting none detected."
+        )
     )
     timestamped_timeline: List[TimelineItem] = Field(
         default_factory=list,

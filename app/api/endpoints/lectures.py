@@ -25,6 +25,7 @@ router = APIRouter()
 async def process_lecture(
     duration_seconds: int = Form(..., ge=1, description="Total recording duration in seconds"),
     audio_file: UploadFile = File(..., description="Audio file binary (.m4a, 16kHz mono, 32kbps)"),
+    lecture_title: Optional[str] = Form(None, description="User inputted lecture / subject title"),
     user_id: str = Depends(get_current_user_id),
 ):
     # 1. Payload Size Validation Guard (Groq 24MB ceiling)
@@ -68,10 +69,15 @@ async def process_lecture(
         del audio_bytes
 
         # 6. Gemini 2.5 Flash Structuring & Quality Gate
+        resolved_title = (
+            (lecture_title.strip() if lecture_title and lecture_title.strip() else None)
+            or audio_file.filename
+            or "General Classroom Lecture"
+        )
         gemini_service = GeminiStructuringService()
         study_guide = await gemini_service.structure_lecture(
             segments=segments,
-            lecture_title=audio_file.filename,
+            lecture_title=resolved_title,
         )
 
         # 7. Persist to Supabase PostgreSQL (Lectures & Study Notes)
@@ -79,6 +85,7 @@ async def process_lecture(
             user_id=user_id,
             duration_seconds=duration_seconds,
             study_guide=study_guide,
+            title=resolved_title,
         )
 
         # 8. Deduct FUP Quota

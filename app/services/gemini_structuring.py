@@ -31,13 +31,29 @@ YOUR OBJECTIVES:
      * warning_banner = null
 
 2. TRANSLATION & NORMALIZATION:
-   - Understand Convert all informal, phonetic Hinglish/Marathi explanations into rigorous, clear, professional Academic English.
+   - Convert all informal, phonetic Hinglish/Marathi explanations into rigorous, clear, professional Academic English.
    - Preserve technical terminology, equations, theorems, and definitions accurately.
 
-3. STRUCTURED EXTRACTIONS:
-   - overall_summary: A comprehensive, cohesive academic synthesis of all topics taught.
+3. SUBJECT RELEVANCE & OFF-TOPIC RANT DETECTION:
+   - You are provided with the student's inputted Subject / Lecture Title.
+   - Cross-reference the professor's explanations against this subject.
+   - Indian university professors frequently go on off-topic tangents, anecdotes, or rants that are completely unrelated to the academic curriculum (e.g., personal complaints, scolding the class on discipline/attendance, hostel/canteen food, administrative grievances, politics, cricket, Bollywood movies, or unrelated personal stories).
+   - In 'overall_summary':
+     * Provide a comprehensive, high-yield academic synthesis of the legitimate subject curriculum taught.
+     * At the end of 'overall_summary', you MUST append a specific, dedicated section:
+       "**Off-Topic Rants & Tangents:** <Describe precisely what the professor ranted about and why it was unrelated to the subject. Summarize the digression so the student is aware of it>".
+     * If no off-topic tangents or rants occurred and the lecture stayed on topic throughout, explicitly write:
+       "**Off-Topic Rants & Tangents:** None detected; the lecture remained focused on the subject."
+   - In 'chronological_notes':
+     * STRICTLY EXCLUDE all off-topic rants, scoldings, and personal anecdotes.
+     * The study notes MUST contain ONLY curriculum-relevant concepts, definitions, derivations, formulas, and technical takeaways. Keep notes 100% academic and high-yield so students can study without distraction.
+   - In 'timestamped_timeline':
+     * If an entire segment was an off-topic rant or tangent, tag the topic with "[Off-Topic Tangent]" (e.g., "[Off-Topic Tangent] Professor rant on canteen food and discipline") and summarize it briefly as non-academic.
+
+4. STRUCTURED EXTRACTIONS:
+   - overall_summary: A comprehensive, cohesive academic synthesis of all topics taught, concluding with the '**Off-Topic Rants & Tangents:**' section.
    - timestamped_timeline: Array of entries with timestamp_start, timestamp_end, topic, and summary.
-   - chronological_notes: Formatted markdown bullet points detailing core concepts, formulas, and definitions.
+   - chronological_notes: Formatted markdown bullet points detailing core concepts, formulas, and definitions (strictly academic).
    - action_items: MUST strictly categorize each item as one of: 'exam_hint', 'assignment', 'deadline', or 'reading'.
    - whatsapp_share_text: Formatted viral study summary designed for student WhatsApp study groups (use bolding and emojis, e.g. ⚠️ for exam hints, 📅 for deadlines, 📚 for readings).
 """
@@ -78,7 +94,12 @@ class GeminiStructuringService:
         
         full_transcript = "\n".join(formatted_transcript_lines)
         user_prompt = (
-            f"Lecture Title: {lecture_title or 'Untitled Lecture'}\n\n"
+            f"Subject / Lecture Title (Inputted by Student): {lecture_title or 'Untitled Lecture'}\n\n"
+            f"Instructions:\n"
+            f"1. Evaluate the transcript against the specified Subject Title.\n"
+            f"2. Identify any off-topic professor rants, discipline scoldings, or personal tangents.\n"
+            f"3. In 'overall_summary', synthesize the academic lecture and explicitly state the off-topic rants under '**Off-Topic Rants & Tangents:**'.\n"
+            f"4. In 'chronological_notes', strictly exclude non-academic rants so notes remain 100% exam-focused.\n\n"
             f"Raw Transcript Segments:\n{full_transcript}"
         )
 
