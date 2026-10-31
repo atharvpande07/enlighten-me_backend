@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = "gsk_placeholder"
     GROQ_MODEL: str = "whisper-large-v3-turbo"
     GEMINI_API_KEY: str = "AIzaSy_placeholder"
-    GEMINI_MODEL: str = "gemini-3.6-flash"
+    GEMINI_MODEL: str = "gemini-3.5-flash-lite"
     GEMINI_FALLBACK_MODEL: str = "gemini-3.5-flash"
     
     # RevenueCat Webhook Secret
