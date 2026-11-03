@@ -31,8 +31,8 @@ def format_seconds_to_timestamp(seconds: float) -> str:
 class GroqTranscriptionService:
     def __init__(self, api_key: Optional[str] = None):
         self.client = AsyncGroq(api_key=api_key or settings.GROQ_API_KEY, timeout=120.0)
-        self.chunk_size_limit = getattr(settings, "GROQ_CHUNK_SIZE_LIMIT", 4_000_000)
-        self.chunk_duration_sec = getattr(settings, "GROQ_CHUNK_DURATION_SECONDS", 210)
+        self.chunk_size_limit = getattr(settings, "GROQ_CHUNK_SIZE_LIMIT", 16_000_000)
+        self.chunk_duration_sec = getattr(settings, "GROQ_CHUNK_DURATION_SECONDS", 300)
 
     async def transcribe_audio(
         self,
@@ -43,9 +43,9 @@ class GroqTranscriptionService:
         """Transcribes audio using Groq Whisper Large V3 Turbo.
         
         Zero compression policy:
-        - If the file is within 3.5 minutes (~4MB), it is dispatched in a single call.
-        - If the file exceeds 3.5 minutes or 4MB (e.g. 5-90 min lecture in original 128kbps quality),
-          it is automatically sliced into 3.5-minute chunks without re-encoding, transcribed
+        - If the file is within 5 minutes (~9.6MB in 256kbps Studio AAC), it is dispatched in a single call.
+        - If the file exceeds 5 minutes or 16MB (e.g. 10-75 min lecture in original 256kbps Studio AAC quality),
+          it is automatically sliced into 5-minute chunks without re-encoding, transcribed
           in chunks, and seamlessly merged with continuous timestamps.
         """
         if len(audio_bytes) > settings.MAX_AUDIO_BYTES:
