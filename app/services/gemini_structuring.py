@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import List, Dict, Any, Optional
 from google import genai
@@ -114,32 +115,49 @@ class GeminiStructuringService:
 
         response = None
         models_to_try = [settings.GEMINI_MODEL]
-        if settings.GEMINI_FALLBACK_MODEL and settings.GEMINI_FALLBACK_MODEL != settings.GEMINI_MODEL:
-            models_to_try.append(settings.GEMINI_FALLBACK_MODEL)
+        for candidate in [
+            settings.GEMINI_FALLBACK_MODEL,
+            "gemini-3.5-flash-lite",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash",
+            "gemini-3.8-flash",
+        ]:
+            if candidate and candidate not in models_to_try:
+                models_to_try.append(candidate)
 
         last_error = None
         for model_name in models_to_try:
-            try:
-                response = await self.client.aio.models.generate_content(
-                    model=model_name,
-                    contents=user_prompt,
-                    config=config,
-                )
-                um = getattr(response, "usage_metadata", None)
-                if um:
-                    p_tok = getattr(um, "prompt_token_count", 0)
-                    c_tok = getattr(um, "candidates_token_count", 0)
-                    t_tok = getattr(um, "total_token_count", 0)
-                    logger.info(
-                        "Gemini Usage: Model=%s | Prompt Tokens=%d | Output Tokens=%d | Total Tokens=%d",
-                        model_name, p_tok, c_tok, t_tok
+            for attempt in range(2):
+                try:
+                    response = await self.client.aio.models.generate_content(
+                        model=model_name,
+                        contents=user_prompt,
+                        config=config,
                     )
-                else:
-                    logger.info("Structuring succeeded using Gemini model: %s", model_name)
+                    um = getattr(response, "usage_metadata", None)
+                    if um:
+                        p_tok = getattr(um, "prompt_token_count", 0)
+                        c_tok = getattr(um, "candidates_token_count", 0)
+                        t_tok = getattr(um, "total_token_count", 0)
+                        logger.info(
+                            "Gemini Usage: Model=%s | Prompt Tokens=%d | Output Tokens=%d | Total Tokens=%d",
+                            model_name, p_tok, c_tok, t_tok
+                        )
+                    else:
+                        logger.info("Structuring succeeded using Gemini model: %s", model_name)
+                    break
+                except Exception as err:
+                    last_error = err
+                    err_msg = str(err)
+                    is_transient = "503" in err_msg or "429" in err_msg or "UNAVAILABLE" in err_msg
+                    if is_transient and attempt == 0:
+                        logger.warning("Gemini model %s hit transient spike (%s). Retrying in 1.5s...", model_name, err_msg)
+                        await asyncio.sleep(1.5)
+                        continue
+                    logger.warning("Gemini model %s failed: %s. Attempting fallback if available...", model_name, err_msg)
+                    break
+            if response:
                 break
-            except Exception as err:
-                last_error = err
-                logger.warning("Gemini model %s failed: %s. Attempting fallback if available...", model_name, str(err))
 
         if not response:
             logger.error("All Gemini structuring attempts failed: %s", str(last_error))
