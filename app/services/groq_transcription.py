@@ -30,21 +30,22 @@ def format_seconds_to_timestamp(seconds: float) -> str:
 
 class GroqTranscriptionService:
     def __init__(self, api_key: Optional[str] = None):
-        self.client = AsyncGroq(api_key=api_key or settings.GROQ_API_KEY)
-        self.chunk_size_limit = getattr(settings, "GROQ_CHUNK_SIZE_LIMIT", 19_000_000)
-        self.chunk_duration_sec = getattr(settings, "GROQ_CHUNK_DURATION_SECONDS", 600)
+        self.client = AsyncGroq(api_key=api_key or settings.GROQ_API_KEY, timeout=120.0)
+        self.chunk_size_limit = getattr(settings, "GROQ_CHUNK_SIZE_LIMIT", 4_000_000)
+        self.chunk_duration_sec = getattr(settings, "GROQ_CHUNK_DURATION_SECONDS", 210)
 
     async def transcribe_audio(
         self,
         audio_bytes: bytes,
         filename: str = "lecture.m4a",
+        duration_seconds: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """Transcribes audio using Groq Whisper Large V3 Turbo.
         
         Zero compression policy:
-        - If the file is within Groq's 19MB boundary, it is dispatched in a single call.
-        - If the file exceeds 19MB (e.g. 30-90 min lecture in original 128kbps quality),
-          it is automatically sliced into 10-minute chunks without re-encoding, transcribed
+        - If the file is within 3.5 minutes (~4MB), it is dispatched in a single call.
+        - If the file exceeds 3.5 minutes or 4MB (e.g. 5-90 min lecture in original 128kbps quality),
+          it is automatically sliced into 3.5-minute chunks without re-encoding, transcribed
           in chunks, and seamlessly merged with continuous timestamps.
         """
         if len(audio_bytes) > settings.MAX_AUDIO_BYTES:
@@ -55,8 +56,14 @@ class GroqTranscriptionService:
                 detail=f"Audio file exceeds {max_mb}MB limit.",
             )
 
-        if len(audio_bytes) <= self.chunk_size_limit:
-            # Single call path for audio under 19MB
+        # Determine if chunking is required based on duration (> chunk_duration_sec) or payload size (> chunk_size_limit)
+        needs_chunking = (
+            (duration_seconds is not None and duration_seconds > self.chunk_duration_sec)
+            or len(audio_bytes) > self.chunk_size_limit
+        )
+
+        if not needs_chunking:
+            # Single call path for short audio under 3.5 mins / 4MB
             segments, _ = await self._transcribe_single_chunk(
                 audio_bytes=audio_bytes,
                 filename=filename,
@@ -67,9 +74,11 @@ class GroqTranscriptionService:
 
         # Chunked path for large/long original-quality lectures
         logger.info(
-            "Audio payload (%d bytes) exceeds %d byte limit. Slicing into %ds chunks for Groq...",
+            "Audio payload (%d bytes, duration: %s) exceeds chunk boundary (%d bytes / %ds). Slicing into %ds chunks for Groq...",
             len(audio_bytes),
+            f"{duration_seconds}s" if duration_seconds is not None else "unknown",
             self.chunk_size_limit,
+            self.chunk_duration_sec,
             self.chunk_duration_sec,
         )
         return await self._transcribe_chunked_audio(audio_bytes, filename=filename)

@@ -63,6 +63,7 @@ async def process_lecture(
         segments = await groq_service.transcribe_audio(
             audio_bytes,
             filename=audio_file.filename or "lecture.m4a",
+            duration_seconds=duration_seconds,
         )
 
         # 5. Flush audio bytes from memory immediately after transcription

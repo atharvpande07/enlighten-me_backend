@@ -41,9 +41,9 @@ class Settings(BaseSettings):
     
     # Payload & Routing Guardrails
     MAX_AUDIO_BYTES: int = 150_000_000  # 150 MB ceiling for client uploads (supports up to ~2.5 hours in original quality)
-    GROQ_CHUNK_SIZE_LIMIT: int = 19_000_000  # 19 MB single-chunk ceiling for Groq Whisper
-    GROQ_CHUNK_DURATION_SECONDS: int = 600  # 10 minutes (600s) per chunk slice for seamless transcription
-    ROUTER_TIMEOUT_SECONDS: int = 180   # Explicit 180s timeout boundary for long lecture synthesis
+    GROQ_CHUNK_SIZE_LIMIT: int = 4_000_000  # 4 MB single-chunk ceiling for Groq Whisper (~4 mins in 128kbps HD voice)
+    GROQ_CHUNK_DURATION_SECONDS: int = 210  # 3.5 minutes (210s) per chunk slice for ultra-fast, timeout-immune transcription
+    ROUTER_TIMEOUT_SECONDS: int = 300   # Explicit 300s (5-minute) timeout boundary for long lecture synthesis
     
     # Fair Usage Policy Defaults (in seconds)
     DEFAULT_FREE_FUP_LIMIT: int = 10800    # 3 Hours = 10,800s
